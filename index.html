@@ -302,18 +302,26 @@
         }
         initGPS();
 
-        // --- GESTURE DETECTION ---
-        let pressTimer = null;
-        function startPress() {
-            if (isEmergency) return;
-            pressTimer = setTimeout(() => activateEmergency('longpress'), 2000);
-        }
-        function cancelPress() { clearTimeout(pressTimer); }
+        // --- GESTURE DETECTION (5-TAP FOR CALL) ---
+        let tapCount = 0;
+        let lastTap = 0;
 
-        document.body.addEventListener('mousedown', startPress);
-        document.body.addEventListener('mouseup', cancelPress);
-        document.body.addEventListener('touchstart', startPress);
-        document.body.addEventListener('touchend', cancelPress);
+        function handleTapGesture(e) {
+            if (isEmergency) return;
+            const now = Date.now();
+            if (now - lastTap < 500) {
+                tapCount++;
+                if (tapCount >= 5) {
+                    activateEmergency('gesture');
+                    tapCount = 0;
+                }
+            } else {
+                tapCount = 1;
+            }
+            lastTap = now;
+        }
+
+        document.body.addEventListener('click', handleTapGesture);
 
         // --- SETUP ---
         if (localStorage.getItem('svContacts')) {
@@ -389,7 +397,7 @@
             document.getElementById('pulse-ring').style.display = 'block';
             document.getElementById('instruction').innerHTML = `<b style="color:var(--primary)">EMERGENCY ACTIVE</b>`;
 
-            showToast(type === 'longpress' ? "DIRECT CALL INITIATED!" : "SMS ALERTS SENT!");
+            showToast(type === 'gesture' ? "DIRECT CALL INITIATED!" : "SMS ALERTS SENT!");
 
             // Actions
             startCamera();
@@ -397,7 +405,7 @@
             startTracking();
 
             // Mobile Execution
-            if (type === 'longpress') {
+            if (type === 'gesture') {
                 directCall();
                 setTimeout(directSMS, 1500);
             } else {
@@ -434,7 +442,11 @@
         function directCall() {
             if (contacts.length > 0) {
                 const phone = contacts[0].phone.replace(/[^0-9+]/g, '');
-                window.location.href = `tel:${phone}`;
+                const link = document.createElement('a');
+                link.href = `tel:${phone}`;
+                link.click();
+            } else {
+                alert("Please go to 'Emergency Setup' and save a phone number first.");
             }
         }
 
@@ -442,10 +454,13 @@
             if (contacts.length > 0) {
                 const lat = coords ? coords.lat : 0;
                 const lng = coords ? coords.lng : 0;
-                const link = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                const mapLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
                 const phone = contacts[0].phone.replace(/[^0-9+]/g, '');
-                const msg = encodeURIComponent(`EMERGENCY! I need help. My live location: ${link}`);
-                window.location.href = `sms:${phone}?body=${msg}`;
+                const msg = encodeURIComponent(`EMERGENCY! I need help. My live location: ${mapLink}`);
+                
+                const link = document.createElement('a');
+                link.href = `sms:${phone}?body=${msg}`;
+                link.click();
             }
         }
 
