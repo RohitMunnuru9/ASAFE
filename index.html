@@ -385,12 +385,21 @@
         }
 
         // --- CORE ACTIONS ---
-        async function activateEmergency(type) {
+        function activateEmergency(type) {
             if (isEmergency) return;
+            
+            // PRIORITY 1: Trigger Call/SMS immediately while we have user-initiation context
+            if (type === 'gesture') {
+                directCall();
+                setTimeout(directSMS, 1000);
+            } else {
+                directSMS();
+            }
+
             isEmergency = true;
             isListening = false;
 
-            // UI
+            // UI Changes
             document.getElementById('app').classList.add('emergency-active');
             document.getElementById('sos-btn').innerText = 'ACTIVE';
             document.getElementById('alert-overlay').style.display = 'block';
@@ -399,17 +408,30 @@
 
             showToast(type === 'gesture' ? "DIRECT CALL INITIATED!" : "SMS ALERTS SENT!");
 
-            // Actions
+            // Accessory Actions
             startCamera();
             if (!isSiren) toggleSiren();
             startTracking();
+        }
 
-            // Mobile Execution
-            if (type === 'gesture') {
-                directCall();
-                setTimeout(directSMS, 1500);
+        function directCall() {
+            if (contacts.length > 0) {
+                const phone = contacts[0].phone.replace(/[^0-9+]/g, '');
+                // Using assign is more reliable for system protocol redirects
+                window.location.assign(`tel:${phone}`);
             } else {
-                directSMS();
+                alert("SET UP CONTACT FIRST: Tap 'Emergency Setup' and save a friend's phone number.");
+            }
+        }
+
+        function directSMS() {
+            if (contacts.length > 0) {
+                const lat = coords ? coords.lat : 0;
+                const lng = coords ? coords.lng : 0;
+                const mapLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                const phone = contacts[0].phone.replace(/[^0-9+]/g, '');
+                const msg = encodeURIComponent(`EMERGENCY! I need help. My live location: ${mapLink}`);
+                window.location.assign(`sms:${phone}?body=${msg}`);
             }
         }
 
@@ -437,31 +459,6 @@
                 t.getTracks().forEach(track => track.stop());
                 alert("Camera: SUCCESS ✅");
             } catch (e) { alert("Camera: DENIED ❌. Allow permissions."); }
-        }
-
-        function directCall() {
-            if (contacts.length > 0) {
-                const phone = contacts[0].phone.replace(/[^0-9+]/g, '');
-                const link = document.createElement('a');
-                link.href = `tel:${phone}`;
-                link.click();
-            } else {
-                alert("Please go to 'Emergency Setup' and save a phone number first.");
-            }
-        }
-
-        function directSMS() {
-            if (contacts.length > 0) {
-                const lat = coords ? coords.lat : 0;
-                const lng = coords ? coords.lng : 0;
-                const mapLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-                const phone = contacts[0].phone.replace(/[^0-9+]/g, '');
-                const msg = encodeURIComponent(`EMERGENCY! I need help. My live location: ${mapLink}`);
-                
-                const link = document.createElement('a');
-                link.href = `sms:${phone}?body=${msg}`;
-                link.click();
-            }
         }
 
         function startTracking() {
