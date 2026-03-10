@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ASAFE | Emergency Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF3B30;
+            --secondary: #5856D6;
+            --background: #000000;
+            --surface: #1C1C1E;
+            --text: #FFFFFF;
+            --text-dim: #A9A9B3;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+        body {
+            background: var(--background);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 450px;
+            height: 100%;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Alert Overlay */
+        #alert-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 59, 48, 0.15);
+            display: none;
+            z-index: 100;
+            pointer-events: none;
+            animation: pulse-bg 1s infinite alternate;
+        }
+
+        @keyframes pulse-bg {
+            from { opacity: 0.3; } to { opacity: 0.7; }
+        }
+
+        .header { margin-bottom: 2rem; text-align: center; }
+        .header h1 { font-weight: 800; font-size: 1.5rem; letter-spacing: -0.5px; color: var(--primary); }
+
+        /* Main SOS Button */
+        .sos-container {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .sos-btn {
+            width: 180px;
+            height: 180px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 2rem;
+            box-shadow: 0 0 50px rgba(255, 59, 48, 0.4);
+            cursor: pointer;
+            z-index: 2;
+            transition: transform 0.2s, background 0.3s;
+        }
+
+        .sos-btn:active { transform: scale(0.92); }
+
+        .pulse {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: pulse-ring 2s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        /* Setup Screen */
+        #setup-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--background);
+            z-index: 200;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group { margin-bottom: 1.5rem; width: 100%; }
+        .input-group label { display: block; margin-bottom: 0.5rem; color: var(--text-dim); font-size: 0.8rem; }
+        .input-group input {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--glass);
+            padding: 1rem;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .save-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1.2rem;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        /* Status & Info */
+        .status-panel {
+            width: 100%;
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 1rem;
+            border: 1px solid var(--glass);
+        }
+
+        .status-item { display: flex; align-items: center; justify-content: space-between; }
+        .status-label { font-size: 0.85rem; color: var(--text-dim); }
+        .status-value { font-size: 0.9rem; font-weight: 600; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; display: inline-block; background: var(--text-dim); }
+
+        #camera-preview {
+            width: 100%;
+            height: 120px;
+            background: #000;
+            border-radius: 12px;
+            margin: 1rem 0;
+            object-fit: cover;
+            border: 1px solid var(--glass);
+        }
+
+        .smart-features { display: flex; gap: 10px; width: 100%; margin-top: 2rem; }
+        .feature-btn {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--glass);
+            padding: 1rem;
+            border-radius: 12px;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .feature-btn.siren { border-color: #FF950066; }
+
+        #toast {
+            position: fixed;
+            bottom: 2rem;
+            background: var(--primary);
+            padding: 1rem 2rem;
+            border-radius: 30px;
+            font-weight: 600;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #secure-warning {
+            position: absolute;
+            top: 0; left: 0; width: 100%;
+            background: #FF9500;
+            color: black;
+            padding: 10px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-align: center;
+            z-index: 300;
+        }
+
+        @keyframes slideUp { from { transform: translateY(100px); } to { transform: translateY(0); } }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+    <div id="secure-warning" style="display: none;">
+        ⚠️ INSECURE CONNECTION: Camera & Mic will not work. Access via HTTPS only.
+    </div>
+
+    <div id="alert-overlay"></div>
+    <div id="toast"></div>
+
+    <div id="setup-screen">
+        <h2 style="margin-bottom: 2rem; font-weight: 800;">Emergency Setup</h2>
+        <div class="input-group"><label>Friend Name</label><input type="text" id="c1-name" placeholder="Name"></div>
+        <div class="input-group"><label>Friend Phone</label><input type="tel" id="c1-phone" placeholder="+91..."></div>
+        <div class="input-group"><label>Friend 2 Name</label><input type="text" id="c2-name" placeholder="Name"></div>
+        <div class="input-group"><label>Friend 2 Phone</label><input type="tel" id="c2-phone" placeholder="+91..."></div>
+        
+        <div style="display:flex; gap:10px; margin-top:auto">
+            <button class="save-btn" style="background:var(--surface); flex:1" onclick="testCamera()">TEST CAM</button>
+            <button class="save-btn" style="flex:2" onclick="saveSettings()">SAVE & START</button>
+        </div>
+    </div>
+
+    <div id="app">
+        <div class="header">
+            <h1>ASAFE</h1>
+            <p id="location" style="color: var(--text-dim); font-size: 0.75rem; margin-top: 5px;">GPS: Initializing...</p>
+        </div>
+
+        <div class="sos-container">
+            <div class="pulse" id="pulse-ring" style="display: none;"></div>
+            <div class="sos-btn" id="sos-btn" onclick="handleButtonClick()">SOS</div>
+        </div>
+
+        <p id="instruction" style="color: var(--text-dim); font-size: 0.9rem; text-align: center; min-height: 2.5rem;">
+            Press SOS to enter Listening Mode
+        </p>
+
+        <video id="camera-preview" autoplay playsinline muted></video>
+
+        <div class="status-panel">
+            <div class="status-item">
+                <span class="status-label">Voice Trigger</span>
+                <div><span id="voice-dot" class="status-dot"></span><span id="voice-status" class="status-value">Idle</span></div>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Evidence Cam</span>
+                <div><span id="cam-dot" class="status-dot"></span><span id="cam-status" class="status-value">Idle</span></div>
+            </div>
+        </div>
+
+        <div class="smart-features">
+            <button class="feature-btn" onclick="fakeCall()">Fake Call</button>
+            <button class="feature-btn siren" id="siren-btn" onclick="toggleSiren()">Silent Alarm</button>
+        </div>
+
+        <!-- Hidden manual link for fallback -->
+        <a id="call-link" style="display: none;"></a>
+        <a id="sms-link" style="display: none;"></a>
+    </div>
+
+    <script>
+        let isEmergency = false;
+        let isListening = false;
+        let isSiren = false;
+        let audioCtx = null;
+        let oscillator = null;
+        let stream = null;
+        let recognition = null;
+        let contacts = [];
+        let locWatcher = null;
+        let coords = null;
+        let gpsLocked = false;
+
+        // --- SECURITY CHECK ---
+        const isSecure = window.isSecureContext || window.location.hostname === 'localhost';
+        if (!isSecure) {
+            document.getElementById('secure-warning').style.display = 'block';
+        }
+
+        // --- GPS INITIAL LOCK ---
+        function initGPS() {
+            if ("geolocation" in navigator) {
+                const opt = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    gpsLocked = true;
+                    document.getElementById('location').innerText = `GPS: Locked ✅ (${coords.lat.toFixed(4)})`;
+                }, (err) => {
+                    document.getElementById('location').innerText = `GPS: Failed (Using Fallback)`;
+                    coords = { lat: 0, lng: 0 }; // We'll try to update later
+                }, opt);
+            }
+        }
+        initGPS();
+
+        // --- GESTURE DETECTION ---
+        let pressTimer = null;
+        function startPress() {
+            if (isEmergency) return;
+            pressTimer = setTimeout(() => activateEmergency('longpress'), 2000);
+        }
+        function cancelPress() { clearTimeout(pressTimer); }
+
+        document.body.addEventListener('mousedown', startPress);
+        document.body.addEventListener('mouseup', cancelPress);
+        document.body.addEventListener('touchstart', startPress);
+        document.body.addEventListener('touchend', cancelPress);
+
+        // --- SETUP ---
+        if (localStorage.getItem('svContacts')) {
+            document.getElementById('setup-screen').style.display = 'none';
+            contacts = JSON.parse(localStorage.getItem('svContacts'));
+        }
+
+        function saveSettings() {
+            const c1 = { name: document.getElementById('c1-name').value, phone: document.getElementById('c1-phone').value };
+            const c2 = { name: document.getElementById('c2-name').value, phone: document.getElementById('c2-phone').value };
+            if (!c1.phone || !c2.phone) { alert('Enter two phone numbers.'); return; }
+            contacts = [c1, c2];
+            localStorage.setItem('svContacts', JSON.stringify(contacts));
+            document.getElementById('setup-screen').style.display = 'none';
+        }
+
+        // --- EMERGENCY FLOW ---
+        function handleButtonClick() {
+            if (isEmergency) stopEmergency();
+            else if (isListening) stopListening();
+            else startListening();
+        }
+
+        function startListening() {
+            isListening = true;
+            document.getElementById('sos-btn').innerText = 'WAITING';
+            document.getElementById('sos-btn').style.background = '#FF9500';
+            document.getElementById('instruction').innerHTML = 'Say <b style="color:white">"Help Me Now"</b>';
+            document.getElementById('voice-dot').style.background = '#FF9500';
+            document.getElementById('voice-status').innerText = 'Listening';
+            startSpeechRecognition();
+        }
+
+        function stopListening() {
+            isListening = false;
+            document.getElementById('sos-btn').innerText = 'SOS';
+            document.getElementById('sos-btn').style.background = 'var(--primary)';
+            document.getElementById('instruction').innerText = 'Press SOS to enter Listening Mode';
+            document.getElementById('voice-dot').style.background = 'var(--text-dim)';
+            document.getElementById('voice-status').innerText = 'Idle';
+            if (recognition) recognition.stop();
+        }
+
+        function startSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                setTimeout(() => { if(isListening) activateEmergency('voice'); }, 4000);
+                return;
+            }
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.onresult = (e) => {
+                const tr = Array.from(e.results).map(r => r[0].transcript.toLowerCase()).join('');
+                if (tr.includes('help me now') || tr.includes('help')) {
+                    activateEmergency('voice');
+                    recognition.stop();
+                }
+            };
+            recognition.onerror = () => { setTimeout(() => { if(isListening) activateEmergency('voice'); }, 5000); };
+            recognition.start();
+        }
+
+        // --- CORE ACTIONS ---
+        async function activateEmergency(type) {
+            if (isEmergency) return;
+            isEmergency = true;
+            isListening = false;
+
+            // UI
+            document.getElementById('app').classList.add('emergency-active');
+            document.getElementById('sos-btn').innerText = 'ACTIVE';
+            document.getElementById('alert-overlay').style.display = 'block';
+            document.getElementById('pulse-ring').style.display = 'block';
+            document.getElementById('instruction').innerHTML = `<b style="color:var(--primary)">EMERGENCY ACTIVE</b>`;
+
+            showToast(type === 'longpress' ? "DIRECT CALL INITIATED!" : "SMS ALERTS SENT!");
+
+            // Actions
+            startCamera();
+            if (!isSiren) toggleSiren();
+            startTracking();
+
+            // Mobile Execution
+            if (type === 'longpress') {
+                directCall();
+                setTimeout(directSMS, 1500);
+            } else {
+                directSMS();
+            }
+        }
+
+        async function startCamera() {
+            const video = document.getElementById('camera-preview');
+            const dot = document.getElementById('cam-dot');
+            if (!navigator.mediaDevices) {
+                document.getElementById('cam-status').innerText = "Insecure Context";
+                return;
+            }
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
+                dot.style.background = '#FF3B30';
+                document.getElementById('cam-status').innerText = "Recording";
+            } catch (err) {
+                document.getElementById('cam-status').innerText = "Cam Error";
+            }
+        }
+
+        async function testCamera() {
+            if (!navigator.mediaDevices) { alert("ERROR: Browser blocks Camera on insecure IPs. Use localhost or HTTPS."); return; }
+            try {
+                const t = await navigator.mediaDevices.getUserMedia({ video: true });
+                t.getTracks().forEach(track => track.stop());
+                alert("Camera: SUCCESS ✅");
+            } catch (e) { alert("Camera: DENIED ❌. Allow permissions."); }
+        }
+
+        function directCall() {
+            if (contacts.length > 0) {
+                const phone = contacts[0].phone.replace(/[^0-9+]/g, '');
+                window.location.href = `tel:${phone}`;
+            }
+        }
+
+        function directSMS() {
+            if (contacts.length > 0) {
+                const lat = coords ? coords.lat : 0;
+                const lng = coords ? coords.lng : 0;
+                const link = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                const phone = contacts[0].phone.replace(/[^0-9+]/g, '');
+                const msg = encodeURIComponent(`EMERGENCY! I need help. My live location: ${link}`);
+                window.location.href = `sms:${phone}?body=${msg}`;
+            }
+        }
+
+        function startTracking() {
+            if ("geolocation" in navigator) {
+                locWatcher = navigator.geolocation.watchPosition((p) => {
+                    coords = { lat: p.coords.latitude, lng: p.coords.longitude };
+                    document.getElementById('location').innerText = `GPS: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`;
+                }, null, { enableHighAccuracy: true });
+            }
+        }
+
+        function stopEmergency() {
+            isEmergency = false;
+            document.getElementById('app').classList.remove('emergency-active');
+            document.getElementById('sos-btn').innerText = 'SOS';
+            document.getElementById('sos-btn').style.background = 'var(--primary)';
+            document.getElementById('alert-overlay').style.display = 'none';
+            document.getElementById('pulse-ring').style.display = 'none';
+            document.getElementById('instruction').innerText = 'Press SOS to enter Listening Mode';
+            document.getElementById('cam-status').innerText = 'Idle';
+            document.getElementById('cam-dot').style.background = 'var(--text-dim)';
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            if (isSiren) toggleSiren();
+            if (locWatcher) navigator.geolocation.clearWatch(locWatcher);
+        }
+
+        function showToast(m) {
+            const t = document.getElementById('toast');
+            t.innerText = m;
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 5000);
+        }
+
+        function toggleSiren() {
+            isSiren = !isSiren;
+            const b = document.getElementById('siren-btn');
+            if (isSiren) { b.innerText = "STOP SIREN"; startSirenSound(); }
+            else { b.innerText = "Silent Alarm"; stopSirenSound(); }
+        }
+
+        function startSirenSound() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                oscillator = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.5);
+                gain.gain.value = 0.5;
+                oscillator.connect(gain); gain.connect(audioCtx.destination);
+                oscillator.start();
+            } catch (e) {}
+        }
+        function stopSirenSound() { if (oscillator) { oscillator.stop(); oscillator = null; } }
+        function fakeCall() { alert('🚨 INCOMING CALL: "Dad"'); }
+    </script>
+</body>
+</html>
